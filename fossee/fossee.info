@@ -1,0 +1,4 @@
+core = "7.x"
+description = "A module for managing Student profiles."
+version = 7.x
+name = "Fossee Form" 

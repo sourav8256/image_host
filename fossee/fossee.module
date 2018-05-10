@@ -1,0 +1,642 @@
+<?php
+
+
+
+function fossee_menu() {
+  $items = array();
+
+  $items['login'] = array( //this creates a URL that will call this form at "examples/form-example"
+    'title' => 'Login', //page title
+    'description' => 'Login page for students and teachers.',
+    'page callback' => 'drupal_get_form', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
+    'page arguments' => array('fossee_login_form'), //put the name of the form here
+    'access callback' => TRUE
+  );
+
+  $items['marks/students'] = array( //this creates a URL that will call this form at "examples/form-example"
+    'title' => 'Student Marks Page', //page title
+    'description' => 'Page for students to see marks.',
+    'page callback' => 'fossee_marks_students', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
+    'page arguments' => array(1), //put the name of the form here
+    'access callback' => TRUE
+  );
+
+  $items['marks/teachers'] = array( //this creates a URL that will call this form at "examples/form-example"
+    'title' => 'Teacher\'s Mark Page', //page title
+    'description' => 'Page for teachers to see all student marks.',
+    'page callback' => 'fossee_marks_teachers', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
+    'page arguments' => array(1), //put the name of the form here
+    'access callback' => TRUE
+  );
+
+  $items['marks/new_entry'] = array( //this creates a URL that will call this form at "examples/form-example"
+    'title' => 'Student Entry Form', //page title
+    'description' => 'Page for teachers to see all student marks.',
+    'page callback' => 'drupal_get_form', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
+    'page arguments' => array('fossee_student_entry_form'), //put the name of the form here
+    'access callback' => TRUE
+  );
+
+  return $items;
+}
+
+
+
+
+
+
+
+function fossee_login_form($form, &$form_state) {
+  
+
+$form['login_username'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Username .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+$form['login_password'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Password .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+$form['user_type'] = array(
+    '#type' => 'radios',
+    '#title' => 'User Type .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,
+    '#options' => array(
+      'teacher'=>t('Teacher'),
+      'student'=>t('Student')
+    )  
+  );
+
+  $form['submit_button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+  
+  return $form;
+}
+
+function fossee_login_form_validate($form, &$form_state) {
+
+}
+
+function fossee_login_form_submit($form, &$form_state) {
+  
+  $username = $form_state['values']['login_username'];
+  $password = $form_state['values']['login_password'];
+  $userType = $form_state['values']['user_type'];
+
+  echo $userType;
+
+  $query = db_select('college_users', 't');
+  $query ->fields('t', array('password','user_type'));
+  $query->condition('t.username',$username,"=");
+  //$query->condition('t.password',$password,"=");
+  $result = $query->execute()->fetchObject();
+
+
+  //drupal_set_message('BEFORE CHECKING Password');
+
+  if($result->password == $password && $result->user_type == $userType){
+    //drupal_set_message("inside password check");
+    
+    if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+    }
+
+    $_SESSION['college_username'] = $username;
+    $_SESSION['college_password'] = $password;
+    $_SESSION['college_user_type'] = $userType;
+    $_SESSION['college_login_status'] = "success";
+
+    if($userType == "student"){
+      $form_state['redirect'] = 'marks/students';
+    } elseif ($userType == "teacher") {
+      $form_state['redirect'] = 'marks/teachers';
+    }
+
+  }
+
+  
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function fossee_marks_students(){
+
+  //drupal_set_message("my message");
+
+    if($_SESSION['college_login_status'] != "success"){
+      return drupal_access_denied();
+    }
+
+   $rows = array();
+
+
+    $header = array(
+      array('data' => t('Key'), 'colspan' => 1),
+      array('data' => t('Value'), 'colspan' => 1),
+    );
+
+
+$query = db_select('student_marks', 't');
+
+
+
+$query ->fields('t', array('ID','name', 'maths', 'physics','chemistry'));
+  $query->condition('t.username',$_SESSION['college_username'],"=");
+
+
+   $table_sort = $query->extend('TableSort') // Add table sort extender.
+                        ->orderByHeader($header); // Add order by headers.
+    $pager = $table_sort->extend('PagerDefault')
+                        ->limit(1);  // here you can limit the number of data per page.
+    $result = $pager->execute();
+
+
+  foreach($result as $res) {
+
+     $rows[] = array(
+                      "Name",
+                      $res->name, 
+                 
+                    );
+
+      $rows[] = array(
+                      "Maths",
+                      $res->maths, 
+                     
+                    );
+
+       $rows[] = array(
+                      "Physics",
+                      $res->physics, 
+                   
+                    );
+
+       $rows[] = array(
+                      "Chemistry",
+                      $res->chemistry, 
+                    
+                    );
+
+
+      $percentage = ($res->maths+$res->physics+$res->chemistry)/3;
+      $percentage = number_format((float)$percentage, 2, '.', '');
+
+       $rows[] = array(
+                      "Percentage",
+                      $percentage, 
+            
+                    );
+}
+
+    $output = '';
+
+    if (!empty($rows)) {
+
+      $output = theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => 'sort-table')));
+
+      $output .= theme('pager');
+
+    }
+
+    else {
+
+      $output .= t("No results found.");
+
+    }
+
+    return $output;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+function fossee_marks_teachers(){
+
+
+if($_SESSION['college_login_status'] == "success" && $_SESSION['college_user_type'] == "teacher"){
+  
+} else {
+  return drupal_access_denied();
+}
+
+  $rows = array();
+
+
+    $header = array(
+      array('data' => t('Index'), 'colspan' => 1),
+      array('data' => t('Name'), 'field' => 'name', 'sort' => 'asc'),
+      array('data' => t('Maths'), 'colspan' => 1),
+      array('data' => t('Physics'), 'colspan' => 1),
+      array('data' => t('Chemistry'), 'colspan' => 1),
+    );
+
+$query = db_select('student_marks', 't');
+
+
+
+$query ->fields('t', array('ID','name', 'maths', 'physics','chemistry'));
+
+
+   $table_sort = $query->extend('TableSort') // Add table sort extender.
+                        ->orderByHeader($header); // Add order by headers.
+    $pager = $table_sort->extend('PagerDefault')
+                        ->limit(20);  // here you can limit the number of data per page.
+    $result = $pager->execute();
+
+    foreach($result as $res) {
+      $rows[] = array(
+                      $res->ID,
+                      $res->name, 
+                      $res->maths,
+                      $res->physics,
+                      $res->chemistry,
+                    );
+    } 
+
+
+
+     $rows[] = array(
+
+          "<a href='link/to'>Add New Entry</a>"
+
+      );
+
+
+    $output = '';
+
+    if (!empty($rows)) {
+
+      $output = theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => 'sort-table')));
+
+      $output .= theme('pager');
+
+    }
+
+    else {
+
+      $output .= t("No results found.");
+
+    }
+
+    return $output;
+
+
+}
+
+
+
+
+
+
+
+function fossee_student_entry_form($form, &$form_state) {
+  
+
+$form['student_name'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Name.:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+$form['student_username'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Username.:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+$form['maths'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Maths .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+$form['physics'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Physics .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+$form['chemistry'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Chemistry .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+  $form['submit_button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+  
+  return $form;
+}
+
+function fossee_student_entry_form_validate($form, &$form_state) {
+  if ((strlen($form_state['values']['student_email']) < 10)){
+    form_set_error('Phone Number', t('Phone number must be 10 numbers long.'));
+  }
+}
+
+function fossee_student_entry_form_submit($form, &$form_state) {
+    db_insert('student_marks')
+  ->fields(array(
+  
+  //'uid' => $user->uid,
+
+  'student_name' => $form_state['values']['student_name'],
+  'student_email' => $form_state['values']['student_email'],
+  'student_roll' => $form_state['values']['student_roll'],
+  
+
+  ))->execute();
+  drupal_set_message("successfully saved data to Database 'student_marks'");
+  
+
+}
+
+
+
+
+
+
+
+
+/*
+function fossee_form($form, &$form_state) {
+  
+
+$form['student_name'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Name.:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+$form['student_email'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Email Address .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+$form['student_roll'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Enrollment Number .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+$form['student_phone'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Phone Number .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+$form['student_bloodgroup'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Blood Group .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+$form['student_semester'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Semester .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+
+
+  $form['submit_button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+  
+  return $form;
+}
+
+function fossee_form_validate($form, &$form_state) {
+  if ((strlen($form_state['values']['student_email']) < 10)){
+    form_set_error('Phone Number', t('Phone number must be 10 numbers long.'));
+  }
+}
+
+function fossee_form_submit($form, &$form_state) {
+    db_insert('student_db_1')
+  ->fields(array(
+  
+  //'uid' => $user->uid,
+
+  'student_name' => $form_state['values']['student_name'],
+  'student_email' => $form_state['values']['student_email'],
+  'student_roll' => $form_state['values']['student_roll'],
+  
+
+  ))->execute();
+  drupal_set_message("successfully saved data to Database 1");
+  
+
+
+ db_insert('student_db_2')
+  ->fields(array(
+  'student_email' => $form_state['values']['student_email'],
+  'student_phone' => $form_state['values']['student_phone'],
+  'student_bloodgroup' => $form_state['values']['student_bloodgroup'],
+  'student_semester' => $form_state['values']['student_semester'],
+
+  ))->execute();
+  drupal_set_message("successfully saved data to Database 2");
+  
+
+}
+
+
+
+
+
+
+
+
+
+function fossee_query_form($form, &$form_state) {
+  
+$form['student_email'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Email Address .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+  
+$form['submit_button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+
+  return $form;
+}
+
+function fossee_query_form_validate($form, &$form_state) {
+  // if (sizeof($form_state['values']['email'])<1){
+  //   form_set_error('Email error : ', t('The email seems invalid please check again.'));
+  // }
+}
+
+function fossee_query_form_submit($form, &$form_state) {
+    
+$form_state['redirect'] = 'display/'.$form_state['values']['student_email'];
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+function fossee_query_form_display($arg_email) {
+    
+$rows = array();
+
+
+    $header = array(
+      array('data' => t('Name'), 'field' => 'student_email', 'sort' => 'desc'),
+      array('data' => t('Email'), 'colspan' => 1),
+      array('data' => t('Enrollment'), 'colspan' => 1),
+      array('data' => t('Phone Number'), 'colspan' => 1),
+      array('data' => t('Blood Group'), 'colspan' => 1),
+      array('data' => t('Semester'), 'colspan' => 1),
+    );
+
+$query = db_select('student_db_1', 't');
+
+
+
+$query ->fields('t', array('student_email', 'student_name', 'student_roll'));
+if($arg_email!=null){
+  $query->condition('t.student_email',$arg_email,"=");
+}
+$query ->fields('n', array('student_email', 'student_phone', 'student_bloodgroup','student_semester'));
+$query->join('student_db_2', 'n', 'n.student_email = t.student_email');
+ 
+
+   $table_sort = $query->extend('TableSort') // Add table sort extender.
+                        ->orderByHeader($header); // Add order by headers.
+    $pager = $table_sort->extend('PagerDefault')
+                        ->limit(20);  // here you can limit the number of data per page.
+    $result = $pager->execute();
+
+    foreach($result as $res) {
+      $rows[] = array($res->student_name, 
+                      $res->student_email,
+                      $res->student_roll,
+                      $res->student_phone,
+                      $res->student_bloodgroup,
+                      $res->student_semester,
+                    );
+    }
+
+
+    $output = '';
+
+    if (!empty($rows)) {
+
+      $output = theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => 'sort-table')));
+
+      $output .= theme('pager');
+
+    }
+
+    else {
+
+      $output .= t("No results found.");
+
+    }
+
+    return $output;
+
+
+}
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+?>
