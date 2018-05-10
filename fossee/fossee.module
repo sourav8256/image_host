@@ -148,7 +148,7 @@ function fossee_marks_students(){
 
   //drupal_set_message("my message");
 
-    if($_SESSION['college_login_status'] != "success"){
+    if($_SESSION['college_login_status'] != "success" || $_SESSION['college_user_type'] != "student"){
       return drupal_access_denied();
     }
 
@@ -292,7 +292,7 @@ $query ->fields('t', array('ID','name', 'maths', 'physics','chemistry'));
 
      $rows[] = array(
 
-          "<a href='link/to'>Add New Entry</a>"
+          "<a href='new_entry'>Add New Entry</a>"
 
       );
 
@@ -326,6 +326,13 @@ $query ->fields('t', array('ID','name', 'maths', 'physics','chemistry'));
 
 function fossee_student_entry_form($form, &$form_state) {
   
+
+if($_SESSION['college_login_status'] == "success" && $_SESSION['college_user_type'] == "teacher"){
+  
+} else {
+  return drupal_access_denied();
+}
+
 
 $form['name'] = array(
     '#type' => 'textfield',
