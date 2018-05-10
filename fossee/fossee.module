@@ -327,7 +327,7 @@ $query ->fields('t', array('ID','name', 'maths', 'physics','chemistry'));
 function fossee_student_entry_form($form, &$form_state) {
   
 
-$form['student_name'] = array(
+$form['name'] = array(
     '#type' => 'textfield',
     '#title' => 'Name.:',
     '#size' => 30,
@@ -335,9 +335,17 @@ $form['student_name'] = array(
     '#required' => TRUE,  
   );
 
-$form['student_username'] = array(
+$form['username'] = array(
     '#type' => 'textfield',
-    '#title' => 'Username.:',
+    '#title' => 'Username .:',
+    '#size' => 30,
+    '#maxlength' => 30,
+    '#required' => TRUE,  
+  );
+
+$form['password'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Password .:',
     '#size' => 30,
     '#maxlength' => 30,
     '#required' => TRUE,  
@@ -378,20 +386,37 @@ $form['chemistry'] = array(
 }
 
 function fossee_student_entry_form_validate($form, &$form_state) {
-  if ((strlen($form_state['values']['student_email']) < 10)){
+  /*if ((strlen($form_state['values']['student_email']) < 10)){
     form_set_error('Phone Number', t('Phone number must be 10 numbers long.'));
-  }
+  }*/
 }
 
 function fossee_student_entry_form_submit($form, &$form_state) {
-    db_insert('student_marks')
+  
+  db_insert('student_marks')
   ->fields(array(
   
   //'uid' => $user->uid,
 
-  'student_name' => $form_state['values']['student_name'],
-  'student_email' => $form_state['values']['student_email'],
-  'student_roll' => $form_state['values']['student_roll'],
+  'name' => $form_state['values']['name'],
+  'username' => $form_state['values']['username'],
+  'maths' => $form_state['values']['maths'],
+  'physics' => $form_state['values']['physics'],
+  'chemistry' => $form_state['values']['chemistry'],
+  
+
+  ))->execute();
+  drupal_set_message("successfully saved data to Database 'student_marks'");
+
+  db_insert('college_users')
+  ->fields(array(
+  
+  //'uid' => $user->uid,
+
+  'name' => $form_state['values']['name'],
+  'username' => $form_state['values']['username'],
+  'password' => $form_state['values']['password'],
+  'user_type' => 'student'
   
 
   ))->execute();
